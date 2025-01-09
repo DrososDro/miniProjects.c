@@ -1,0 +1,15 @@
+# Ignore all files
+*
+!.gitignore
+
+# Do not ignore directories, so Git can access subdirectories
+!*/
+
+# Allow .c source files
+!*.c
+!*.h
+*/build
+!*/data/*
+
+!Makefile
+
