@@ -7,25 +7,52 @@
 #include <string.h>
 
 const char *fullPathName = "Data/userData.txt";
-
 static char *parseUserData(char *displayMessage, int mode);
 static FILE *getOrCreateFile(void);
-void writeUserToFile(struct user *localUser);
+static void writeUserToFile(struct user *localUser);
 static bool isValidUserName(char *username);
 
-void writeUserToFile(struct user *localUser) {
-  int id;
+static void writeUserToFile(struct user *localUser) {
+  char *buffLine = NULL;
+  size_t buffLine_size;
+  int id = 1;
   FILE *fp = NULL;
-  fp = getOrCreateFile();
-  rewind(fp);
-  fscanf(fp, "%d", &id);
-  id += 1;
 
+  fp = getOrCreateFile();
   fseek(fp, 0, SEEK_END);
-  printf("\nid: %d\n", id);
+
+  // if file and writen data on file then seek for newline to get the last id
+  if (ftell(fp) > 10) {
+    while (ftell(fp) > 1) {
+      fseek(fp, -2, SEEK_CUR);
+      if (fgetc(fp) == '\n') {
+        break;
+      }
+    }
+
+    if (getline(&buffLine, &buffLine_size, fp) < 10) {
+      fprintf(stderr, "There is an error the programm is Terminating "
+                      "NOW!\nContact the administrator!\n");
+      goto CLOSE_FILE;
+    }
+
+    char *p;
+    strtok(buffLine, ",");
+    p = strtok(NULL, ",");
+    if (p != NULL) {
+      sscanf(p, "%d", &id);
+      id++;
+    }
+    printf("id is: %d", id);
+  }
+
   localUser->id = id;
   fprintf(fp, "%s,%d,%s,%s,%s", localUser->username, localUser->id,
           localUser->name, localUser->surname, localUser->password);
+CLOSE_FILE:
+  if (buffLine != NULL) {
+    free(buffLine);
+  }
   fclose(fp);
 }
 
@@ -36,12 +63,13 @@ static char *getPassword(void) {
   bool isValidPassword = false;
 
   while (!isValidPassword) {
-    printf("Enter Password");
+    printf("Enter Password: ");
     getline(&password, &password_s, stdin);
-    printf("Verify Password");
+    printf("Verify Password: ");
     getline(&password2, &password2_s, stdin);
 
-    if ((password_s == password2_s) && (strcmp(password, password2) == 0)) {
+    if (strlen(password) > 3 && (password_s == password2_s) &&
+        (strcmp(password, password2) == 0)) {
       isValidPassword = true;
     }
   }
@@ -69,19 +97,14 @@ static FILE *getOrCreateFile(void) {
   sprintf(command, "mkdir -p %s\n", tempFullPath);
   if (system(command) != 0) {
     printf("Can't create dir:\n%s", tempFullPath);
+    free(tempFullPath);
     exit(1);
   }
   free(tempFullPath);
-  fp = fopen(fullPathName, "w+");
+
+  fp = fopen(fullPathName, "a+");
   if (fp == NULL) {
     fprintf(stderr, "Can't open %s\n", fullPathName);
-    exit(1);
-  }
-  fprintf(fp, "%d\n", -1);
-  fclose(fp);
-  fp = fopen(fullPathName, "r+");
-  if (fp == NULL) {
-    puts("Can't Create folder exiting the program.");
     exit(1);
   }
   return fp;
@@ -92,6 +115,8 @@ void createUser(struct user *local) {
   local->surname = parseUserData("Enter your Surname: ", 1);
   local->username = parseUserData("Enter your Username: ", 2);
   local->password = getPassword();
+
+  writeUserToFile(local);
 }
 
 // parse user data from input;
@@ -116,6 +141,9 @@ static char *parseUserData(char *displayMessage, int mode) {
       isValid = isStrAlpha(p);
     } else if (mode == 2) {
       isValid = isValidUserName(p);
+    }
+    if (isValid && strlen(buff) < 4) {
+      isValid = false;
     }
   };
   size = strlen(p);
